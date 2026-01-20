@@ -16,6 +16,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from sentence_transformers import SentenceTransformer
 from pdf2image import convert_from_path
+from pypdf import PdfReader
 
 app = FastAPI(title="Local RAG API")
 
@@ -133,27 +134,49 @@ async def ingest_document(file: UploadFile = File(...)) -> Dict[str, Any]:
 
     # 2. Traitement PDF / Images
     elif filename.endswith('.pdf'):
-        images = convert_from_path(file_path)
+        # Étape A : Tentative d'extraction rapide (Texte)
+        try:
+            reader = PdfReader(file_path)
+            full_text = ""
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    full_text += text + "\n"
 
-        for i, img in enumerate(images):
-            img_path = f"data/{file.filename}_p{i}.jpg"
-            img.save(img_path, 'JPEG')
+            # Si on a trouvé suffisamment de texte (> 50 caractères), on indexe directement
+            if len(full_text.strip()) > 50:
+                print("Mode Rapide : Texte extrait nativement.")
+                vector = get_local_embedding(full_text)
+                points.append(models.PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector=vector,
+                    payload={"type": "text_doc", "content": full_text, "source": filename}
+                ))
 
-            # Vision Locale (LLaVA)
-            description = analyze_image_with_llava(img_path)
+            # Étape B : Si pas de texte (Scan), on utilise la Vision (Lent)
+            else:
+                print("Mode Vision : Scan détecté, utilisation de LLaVA...")
+                images = convert_from_path(file_path)
+                for i, img in enumerate(images):
+                    img_path = f"data/{file.filename}_p{i}.jpg"
+                    img.save(img_path, 'JPEG')
 
-            vector = get_local_embedding(description)
+                    description = analyze_image_with_llava(img_path)
+                    vector = get_local_embedding(description)
 
-            points.append(models.PointStruct(
-                id=str(uuid.uuid4()),
-                vector=vector,
-                payload={
-                    "type": "visual_doc",
-                    "content": description,
-                    "image_path": img_path,
-                    "source": filename
-                }
-            ))
+                    points.append(models.PointStruct(
+                        id=str(uuid.uuid4()),
+                        vector=vector,
+                        payload={
+                            "type": "visual_doc",
+                            "content": description,
+                            "image_path": img_path,
+                            "source": filename
+                        }
+                    ))
+
+        except Exception as e:
+            print(f"Erreur lecture PDF: {e}")
 
     # Upsert dans Qdrant
     if points:
