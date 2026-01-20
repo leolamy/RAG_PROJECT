@@ -6,8 +6,6 @@ services:
     image: qdrant/qdrant:latest
     ports:
       - "6333:6333"
-    volumes:
-      - qdrant_data:/qdrant/storage
 
   # 2. Backend API
   backend:
@@ -30,6 +28,3 @@ services:
       - "3000:80"
     depends_on:
       - backend
-
-volumes:
-  qdrant_data:

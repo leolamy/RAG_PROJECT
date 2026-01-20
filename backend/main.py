@@ -38,7 +38,7 @@ app.add_middleware(
 
 # Initialisation DB
 try:
-    client_qdrant.create_collection(
+    client_qdrant.recreate_collection(
         collection_name=COLLECTION_NAME,
         vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
     )
@@ -105,7 +105,11 @@ def analyze_image_with_llava(image_path: str) -> str:
 
 @app.post("/ingest")
 async def ingest_document(file: UploadFile = File(...)) -> Dict[str, Any]:
-    """Endpoint pour ingérer CSV ou PDF."""
+    client_qdrant.recreate_collection( # clean pour éviter de se baser sur lesi nfos précédentes
+        collection_name=COLLECTION_NAME,
+        vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
+    )
+    #print("Base vectorielle vidée pour le nouveau document.")
     file_path = f"data/{file.filename}"
 
     # Écriture du fichier
@@ -118,9 +122,7 @@ async def ingest_document(file: UploadFile = File(...)) -> Dict[str, Any]:
     # 1. Traitement CSV
     if filename.endswith('.csv'):
         df = pd.read_csv(file_path)
-        # On limite si le CSV est énorme (1000 lignes max pour la démo)
-        for idx, row in df.head(1000).iterrows():
-            # Conversion de la Série pandas en dictionnaire pour itération propre
+        for idx, row in df.head(1000).iterrows(): # max 1000 lignes sinon trop gros
             row_dict = row.to_dict()
             content = ", ".join([f"{col}: {val}" for col, val in row_dict.items()])
 
