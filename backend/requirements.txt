@@ -1,0 +1,10 @@
+fastapi==0.109.0
+uvicorn==0.27.0
+python-multipart==0.0.6
+qdrant-client==1.7.0
+pandas==2.2.0
+# Libs pour Embeddings locaux & PDF
+sentence-transformers==2.3.1
+pdf2image==1.17.0
+Pillow==10.2.0
+requests==2.31.0

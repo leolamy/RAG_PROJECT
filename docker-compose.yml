@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # 1. Base Vectorielle
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  # 2. Backend API
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+    environment:
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - QDRANT_URL=http://qdrant:6333
+      - OLLAMA_MODEL=llama3.2
+    depends_on:
+      - qdrant
+
+  # 4. Frontend Application
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  qdrant_data:
